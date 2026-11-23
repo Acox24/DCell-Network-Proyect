@@ -17,7 +17,7 @@ def DynamicDCell(num_cells=4):
     hosts_per_cell = num_cells - 1
 
     net = Mininet(controller=RemoteController, switch=OVSSwitch)
-    c1 = net.addController('c1', controller=RemoteController, ip="172.17.0.2", port=6653)
+    c1 = net.addController('c1', controller=RemoteController, ip="172.20.0.2", port=6653)
 
     switches = {}
     hosts = {}
