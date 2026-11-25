@@ -70,8 +70,8 @@ def parse_iperf_udp(output):
     return 0.0, 0.0
 
 
-def obtener_ip_host(c, h, hosts_per_cell=15):
-    """Calcula la IP /24 asignada en la topología de 16 celdas (10.0.0.1 - 10.0.0.240)."""
+def obtener_ip_host(c, h, hosts_per_cell=7):
+    """Calcula la IP /24 asignada en la topología de 8 celdas (10.0.0.1 - 10.0.0.56)."""
     ip_counter = c * hosts_per_cell + h + 1
     return f"10.0.0.{ip_counter}"
 
@@ -81,10 +81,10 @@ def bridge_host_para_celda(celda_origen, celda_destino):
     return celda_destino - 1 if celda_origen < celda_destino else celda_destino
 
 
-def construir_prueba(id_prueba, tipo, c1, h1, c2, h2):
+def construir_prueba(id_prueba, tipo, c1, h1, c2, h2, hosts_per_cell=7):
     src = f"h{c1}_{h1}"
     dst = f"h{c2}_{h2}"
-    dst_ip = obtener_ip_host(c2, h2)
+    dst_ip = obtener_ip_host(c2, h2, hosts_per_cell)
 
     if tipo == 'Intra-celda':
         saltos_l3_l2 = f'0 L3 / 1 L2 (s{c1+1})'
@@ -110,33 +110,34 @@ def construir_prueba(id_prueba, tipo, c1, h1, c2, h2):
     }
 
 
-def obtener_pruebas_fijas():
-    """Devuelve 5 pruebas fijas por categoría (15 pruebas en total)."""
+def obtener_pruebas_fijas_8_celdas():
+    """Devuelve 5 pruebas fijas por categoría para 8 celdas (15 pruebas en total)."""
+    hosts_per_cell = 7  # 8 - 1 hosts por celda (índices 0..6)
     pares = [
         # 5 Intra-celda
         ('Intra-celda', 0, 0, 0, 1),
         ('Intra-celda', 1, 2, 1, 3),
         ('Intra-celda', 3, 0, 3, 4),
-        ('Intra-celda', 7, 5, 7, 6),
-        ('Intra-celda', 15, 0, 15, 1),
+        ('Intra-celda', 5, 1, 5, 2),
+        ('Intra-celda', 7, 0, 7, 1),
 
         # 5 Inter-celda directo (eth1)
         ('Inter-celda directo', 0, 0, 1, 0),
         ('Inter-celda directo', 0, 1, 2, 0),
         ('Inter-celda directo', 1, 1, 2, 1),
-        ('Inter-celda directo', 0, 14, 15, 0),
-        ('Inter-celda directo', 4, 1, 5, 4),
+        ('Inter-celda directo', 0, 6, 7, 0),
+        ('Inter-celda directo', 3, 4, 4, 3),
 
         # 5 Inter-celda multi-salto (tránsito por hosts puente)
         ('Inter-celda multi-salto', 0, 0, 2, 1),
         ('Inter-celda multi-salto', 0, 2, 3, 5),
         ('Inter-celda multi-salto', 1, 0, 4, 3),
-        ('Inter-celda multi-salto', 5, 0, 10, 2),
-        ('Inter-celda multi-salto', 8, 1, 15, 7),
+        ('Inter-celda multi-salto', 2, 0, 6, 4),
+        ('Inter-celda multi-salto', 1, 2, 7, 5),
     ]
 
     return [
-        construir_prueba(f"EXP-{idx:02d}", tipo, c1, h1, c2, h2)
+        construir_prueba(f"EXP-{idx:02d}", tipo, c1, h1, c2, h2, hosts_per_cell)
         for idx, (tipo, c1, h1, c2, h2) in enumerate(pares, start=1)
     ]
 
@@ -236,7 +237,7 @@ def run_concurrencia_test(pruebas_directas, duracion_tcp=5):
     }
 
 
-def generar_graficas(resultados, filename='resultados_dcell_16_15pruebas.png'):
+def generar_graficas(resultados, filename='resultados_dcell_8_15pruebas.png'):
     individuales = [r for r in resultados if r['Tipo de Flujo'] != 'Concurrencia total']
     grupos = defaultdict(list)
     for r in individuales:
@@ -252,7 +253,7 @@ def generar_graficas(resultados, filename='resultados_dcell_16_15pruebas.png'):
     loss = [sum(x['Pérdida UDP (%)'] for x in grupos[f]) / len(grupos[f]) for f in flujos]
 
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle('Benchmark DCell (16 celdas, /24) — 5 pruebas fijas por tipo de flujo', fontsize=13, fontweight='bold')
+    fig.suptitle('Benchmark DCell (8 celdas, /24) — 5 pruebas fijas por tipo de flujo', fontsize=13, fontweight='bold')
 
     axs[0, 0].bar(flujos, tcp, color=['#2b5c8f', '#3a7ca5', '#5da271'])
     axs[0, 0].set_title('Throughput TCP promedio (Mbps)')
@@ -283,7 +284,7 @@ if __name__ == '__main__':
     duracion_tcp = 5
     duracion_udp = 5
 
-    pruebas = obtener_pruebas_fijas()
+    pruebas = obtener_pruebas_fijas_8_celdas()
     resultados = [run_flow_test(p, duracion_tcp=duracion_tcp, duracion_udp=duracion_udp) for p in pruebas]
 
     directas = [p for p in pruebas if p['tipo'] == 'Inter-celda directo']
@@ -302,7 +303,7 @@ if __name__ == '__main__':
         'Pérdida UDP (%)'
     ]
 
-    csv_file = 'resultados_dcell_16_15pruebas.csv'
+    csv_file = 'resultados_dcell_8_15pruebas.csv'
     with open(csv_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
